@@ -1,0 +1,252 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library("gridExtra")
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+------------------------------------------------------------------------
+
+## Part 1: Data
+
+### 1.1 Dataset Overview
+
+The Behavioral Risk Factor Surveillance System (BRFSS) is a project that persistently monitors the healthy status by doing survey via telephone in all U.S. states and territories since 1984. The data are observational in nature. The data collected are mostly from non-institutionalized adults over 18 years old. The respondent is randomly selected from adults in same household via land-line telephone and from adults in same private or college housing via mobile questionnaire.
+
+BRFSS aims at collecting uniform and state-specific data on preventive health practices and risk behaviors that are linked to chronic diseases, injuries, and preventable infectious diseases. The factors includes tobacco use, HIV/AIDS knowledge and prevention, exercise, immunization, health status, etc.
+
+### 1.2 Generalizability and Causality
+
+As data are collected using stratified random sampling from all states and territories in U.S., so it is reasonable to generalize sampled data to entire U.S. population. However, this is an observational experiment, so we cannot conclude the causation between variables, instead, we can only establish the correlations.
+
+### 1.3 Bias Sample
+
+And one thing important is that, since the survey is via in-line telephone and mobile, so the **convenience bias** might be introduced because someone are unable to answer via telephone. Or some of the respondents they are not willing to participate in, which leads to the **non-response bias**. Or some people they cannot remember the answer or may misunderstand the questions, this might result in incomplete and inaccurate surveys. So all the potential problems might affect the accuracy of the result.
+
+------------------------------------------------------------------------
+
+## Part 2: Research questions
+
+**Research question 1:** How the kidney disease varies from different gender and educational level?
+
+**Research question 2:** How the Asthma varies in different states?
+
+**Research question 3:** How the Mental health changes in different pregnancy status along the year?
+
+------------------------------------------------------------------------
+
+## Part 3: Exploratory data analysis
+
+**Research question 1:** How the kidney disease varies from different gender and educational level?
+
+Required variables:
+
+-   sex: male or female
+
+-   educa : educational level
+
+-   chckidny: whether or not got kidney disease
+
+So, at first, create a new data frame for storeing only those three variables. There are overall 491,775 records
+
+```{r 1-1}
+df1 <- data.frame(
+  "Gender" = brfss2013$sex,
+  "Education" = brfss2013$educa,
+  "Kidney Disease"= brfss2013$chckidny)
+```
+
+However, not all of them are informative due to the missing values. Therefore, we need to clean the data, removing all the missing data. Now there are only 487,850 records.
+
+```{r 1-2}
+df1<- df1 |>
+  filter(!is.na(Gender),!is.na(Education), !is.na(Kidney.Disease))
+```
+
+First, we visualize the relationship between gender and kidney disease. But only comparing the number of male and female who got kidney disease is not precise as the number of male and female participating in this survey might differ. So, instead of using quantity, we use the percentage of male and female that got kidney disease.
+
+```{r 1-3}
+df1|> 
+  ggplot(aes(x=Kidney.Disease,fill=Gender))+
+  geom_bar(aes( y=..count../tapply(..count.., ..fill.. ,sum)[..fill..]), position="dodge2" ) +
+   geom_text(aes( y=..count../tapply(..count.., ..fill.. ,sum)[..fill..],
+                  label=scales::percent(..count../tapply(..count.., ..fill.. ,sum)[..fill..]) ),
+             stat="count", position=position_dodge(0.9), vjust=-0.5)+
+  labs(title = "Gender vs.Kidney Disease",  x="Have kidney disease?", y = "Percentage")
+```
+
+The results show that gender doesn't affect the rate of the kidney disease. As the rate of getting kidney disease between male and female doesn't show strong difference.
+
+Then we explore the relationship between education level and getting kidney disease.
+
+```{r 1-4}
+df1$Education<- df1$Education|>
+  recode(
+    "Never attended school or only kindergarten" = "No edu",
+    "Grades 1 through 8 (Elementary)" = "Elementary",
+    "Grades 9 though 11 (Some high school)" = "Grade 9-11",
+    "Grade 12 or GED (High school graduate)" = ">Grade 11",
+    "College 1 year to 3 years (Some college or technical school)" = "College",
+    "College 4 years or more (College graduate)" = "Graduate"
+  )
+df1|> 
+  ggplot(aes(x=Kidney.Disease,fill=Education))+
+  geom_bar(aes( y=..count../tapply(..count.., ..fill.. ,sum)[..fill..]), position="dodge2" ) +
+   geom_text(aes( y=..count../tapply(..count.., ..fill.. ,sum)[..fill..],
+                  label=scales::percent(..count../tapply(..count.., ..fill.. ,sum)[..fill..]) ),
+             stat="count", position=position_dodge(0.98), vjust=-0.5, size=3)+
+  labs(title = "Education vs.Kidney Disease",  x="Have kidney disease?", y = "Percentage")
+```
+
+We can see that, with the education level increasing, the rate of getting kidney disease decreased, which implicates that people higher education have more awareness of preventing the kidney disease.
+
+**Research question 2:** How the Asthma varies in different states?
+
+Required variables:
+
+-   \_state: State Fips Code
+
+-   diabete3: (Ever Told) You Have Diabetes
+
+```{r 2-1}
+df2<- data.frame(
+  "State" = tolower(brfss2013$X_state),
+  "Diabete" = brfss2013$diabete3)
+```
+
+```{r 2-2}
+df2<-
+  df2|> filter(!is.na(State),!is.na(Diabete))
+```
+
+```{r 2-3}
+df2$Diabete<- df2$Diabete|>
+  recode(
+    "Yes, but female told only during pregnancy" = "pregnancy diabetes",
+    "No, pre-diabetes or borderline diabetes" = "pre-diabetes"
+  )
+```
+
+```{r 2-4}
+df2_num <- df2|>
+  group_by(State,Diabete)|>
+  tally()
+
+df2_total<- df2|>
+  group_by(State)|>
+  tally()
+
+df2_total_num<- left_join(df2_num,df2_total, by="State")
+df2_total_num<- 
+  mutate(df2_total_num, ratio = n.x/n.y)|>
+  filter(State!= 0)
+```
+
+```{r 2-5}
+map<-map_data("state")
+
+y<-
+  filter(df2_total_num, Diabete == "Yes")|>
+  ggplot(aes(fill=ratio)) + 
+  geom_map(aes(map_id=State),map = map) + 
+  expand_limits(x = map$long, y = map$lat) +
+  labs(title = "Diabetes rate in different states", fill="rate")+
+  theme(plot.title = element_text(size = 10))
+
+n<-
+  filter(df2_total_num, Diabete == "No")|>
+  ggplot(aes(fill=ratio)) + 
+  geom_map(aes(map_id=State),map = map) + 
+  expand_limits(x = map$long, y = map$lat) +
+  labs(title = "Non-diabetes rate in different states", fill="rate")+
+  theme(plot.title = element_text(size = 10))
+
+preg<-
+  filter(df2_total_num, Diabete == "pregnancy diabetes")|>
+  ggplot(aes(fill=ratio)) + 
+  geom_map(aes(map_id=State),map = map) + 
+  expand_limits(x = map$long, y = map$lat) +
+  labs(title = "Pregnancy diabetes rate in different states", fill="rate")+
+  theme(plot.title = element_text(size = 10))
+
+pre<-
+  filter(df2_total_num, Diabete == "pre-diabetes")|>
+  ggplot(aes(fill=ratio)) + 
+  geom_map(aes(map_id=State),map = map) + 
+  expand_limits(x = map$long, y = map$lat) +
+  labs(title = "Pre-diabetes rate in different states", fill="rate")+
+  theme(plot.title = element_text(size = 10))
+
+grid.arrange(y,n,preg,pre)
+```
+
+As we can see from the results, the diabetes rate in north-western states are lower with lowest state Colorado and in south-eastern states are higher, especially Mississippi and Alabama . Non-diabetes rate in states in south-eastern U.S. are relatively lower than north-western part, with Colorado highest and Tennessee lowest. Pregnancy diabetes rate varies in different states, Rates in California, Louisiana and Georgia are relatively higher, while in Wisconsin and Michigan are lowest. Pre-diabetes rate in different states is overall low around 0.025 except the Tennessee (more than 0.075).
+
+**Research question 3:** How the Avg Drinking Per Day In Past changes in different income level for different genders?
+
+Required variables:
+
+-   income2 : Income Level
+
+-   sex: Gender
+
+-   avedrnk2: Avg Alcoholic Drinks Per Day In Past 30
+
+```{r 3-1}
+df3<-data.frame(
+  "Gender" = brfss2013$sex,
+  "Income" = brfss2013$income2,
+  "Avg drinkings" = brfss2013$avedrnk2
+)
+
+df3<- df3|>
+  filter(!is.na(Gender), !is.na(Income), !is.na(Avg.drinkings))
+
+df3|>
+  distinct(Income)
+```
+
+```{r 3-2}
+df3$Income<-
+  df3$Income|>recode(
+    "Less than $10,000" = "<10k",
+    "Less than $15,000" = "<15k",
+    "Less than $20,000" = "<20k",
+    "Less than $25,000" = "<25k",
+    "Less than $35,000" = "<35k",
+    "Less than $50,000" = "<50k",
+    "Less than $75,000" = "<75k",
+    "$75,000 or more" = ">=75k"
+  )
+```
+
+```{r 3-3}
+summarys <- df3|>
+  group_by(Gender,Income)|>
+  summarize(mean = mean(Avg.drinkings))
+
+summarys|>
+  ggplot(aes(x=Income,y=mean, group=Gender)) + 
+  geom_line(aes(color=Gender)) +
+  geom_point(aes(color=Gender))
+```
+
+As we can see from the plot, male drinks more than female, and with the income increasing, the avg drinking per day decreases.
