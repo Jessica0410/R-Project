@@ -47,9 +47,9 @@ And one thing important is that, since the survey is via in-line telephone and m
 
 **Research question 1:** How the kidney disease varies from different gender and educational level?
 
-**Research question 2:** How the Asthma varies in different states?
+**Research question 2:** How the diabetes varies in different states?
 
-**Research question 3:** How the Mental health changes in different pregnancy status along the year?
+**Research question 3:** How the Avg Drinking Per Day In Past changes in different income level for different genders?
 
 ------------------------------------------------------------------------
 
@@ -118,7 +118,7 @@ df1|>
 
 We can see that, with the education level increasing, the rate of getting kidney disease decreased, which implicates that people higher education have more awareness of preventing the kidney disease.
 
-**Research question 2:** How the Asthma varies in different states?
+**Research question 2:** How the diabete varies in different states?
 
 Required variables:
 
